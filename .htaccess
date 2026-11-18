@@ -6,6 +6,7 @@ RewriteRule ^\.env - [F,L]
 RewriteRule ^\.git - [F,L]
 RewriteRule ^backend/(config|src|bin) - [F,L]
 RewriteRule ^database - [F,L]
+RewriteRule ^storage - [F,L]
 
 # 2. Ruteo de API: /api/*.php -> backend/public/*.php
 RewriteRule ^api/([a-zA-Z0-9_\-]+)\.php$ backend/public/$1.php [L,QSA]

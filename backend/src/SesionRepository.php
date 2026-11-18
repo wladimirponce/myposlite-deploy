@@ -33,7 +33,7 @@ final class SesionRepository
     public function contextos(string $id): array
     {
         $query = $this->db->prepare(
-            "SELECT e.id, e.rut, e.razon_social AS nombre, m.rol_codigo AS rol,
+            "SELECT e.id, e.rut, e.razon_social AS nombre, COALESCE(e.rubro, 'otro') AS rubro, m.rol_codigo AS rol,
                 l.codigo AS local_codigo, l.nombre AS local_nombre
             FROM membresias m
             JOIN empresas e ON e.id = m.empresa_id AND e.activa = 1
@@ -69,6 +69,7 @@ final class SesionRepository
                 'id' => $empresaId,
                 'rut' => $row['rut'],
                 'nombre' => $row['nombre'],
+                'rubro' => $row['rubro'] ?? 'otro',
                 'rol' => $row['rol'],
                 'locales' => [],
             ];
