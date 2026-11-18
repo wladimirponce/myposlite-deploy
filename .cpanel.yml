@@ -3,11 +3,12 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/zylajdcb/lite
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/mkdir -p $DEPLOYPATH/assets $DEPLOYPATH/backend $DEPLOYPATH/database $DEPLOYPATH/icons
+    - /bin/mkdir -p $DEPLOYPATH/assets $DEPLOYPATH/backend $DEPLOYPATH/database $DEPLOYPATH/icons $DEPLOYPATH/img
     - /bin/cp -R assets $DEPLOYPATH/
     - /bin/cp -R backend $DEPLOYPATH/
     - /bin/cp -R database $DEPLOYPATH/
     - /bin/cp -R icons $DEPLOYPATH/
+    - /bin/cp -R img $DEPLOYPATH/
     - /bin/cp sw.js $DEPLOYPATH/sw.js
     - /bin/cp manifest.webmanifest $DEPLOYPATH/manifest.webmanifest
     - /bin/cp index.html $DEPLOYPATH/index.html

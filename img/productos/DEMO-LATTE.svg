@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="cup" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff5eb"/>
+      <stop offset="100%" stop-color="#e8d5c4"/>
+    </linearGradient>
+    <linearGradient id="coffee" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#795548"/>
+      <stop offset="60%" stop-color="#d7ccc8"/>
+      <stop offset="100%" stop-color="#8d6e63"/>
+    </linearGradient>
+    <linearGradient id="ice" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#e0f7fa" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+  <!-- Sombra de vaso -->
+  <ellipse cx="100" cy="180" rx="45" ry="12" fill="#000000" opacity="0.12"/>
+  <!-- Vaso de vidrio cónico -->
+  <path d="M65,45 L135,45 L125,170 C124,176 114,178 100,178 C86,178 76,176 75,170 Z" fill="url(#coffee)"/>
+  <path d="M63,40 L137,40 L135,45 L65,45 Z" fill="#ffffff" opacity="0.6"/>
+  <!-- Hielos -->
+  <rect x="75" y="60" width="22" height="22" rx="4" fill="url(#ice)" transform="rotate(15 86 71)"/>
+  <rect x="105" y="70" width="20" height="20" rx="4" fill="url(#ice)" transform="rotate(-12 115 80)"/>
+  <rect x="88" y="95" width="24" height="24" rx="5" fill="url(#ice)" transform="rotate(25 100 107)"/>
+  <!-- Pajita / Bombilla -->
+  <line x1="100" y1="140" x2="135" y2="20" stroke="#ff7043" stroke-width="7" stroke-linecap="round"/>
+  <!-- Brillo de vaso -->
+  <path d="M72,52 L78,162 C78,162 76,160 76,155 L70,52 Z" fill="#ffffff" opacity="0.4"/>
+</svg>
