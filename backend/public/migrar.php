@@ -139,28 +139,9 @@ try {
     $pdo->prepare('INSERT INTO membresias (empresa_id, usuario_id, rol_codigo) VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE rol_codigo = VALUES(rol_codigo)')->execute([$empresa, $userId, 'administrador']);
 
-    // Productos de prueba
-    $numProd = (int) $pdo->query("SELECT COUNT(*) FROM productos WHERE empresa_id = $empresa")->fetchColumn();
-    if ($numProd === 0) {
-        $stmtP = $pdo->prepare('INSERT INTO productos (empresa_id, sku, nombre, unidad_base, afecto_iva, categoria, activo) VALUES (?, ?, ?, ?, 1, ?, 1)');
-        $stmtPres = $pdo->prepare('INSERT INTO producto_presentaciones (producto_id, nombre, factor, codigo_barra, precio, activo) VALUES (?, ?, ?, ?, ?, 1)');
-
-        $prods = [
-            ['BEB-01', 'Bebida Cola 1.5L', 'unidad', 'Bebidas', 'Unidad', 1, '7801234567890', 1690],
-            ['PAN-01', 'Pan Marraqueta', 'kg', 'Panadería', 'Kilo', 1, '7801234567891', 1990],
-            ['LEC-01', 'Leche Entera 1L', 'unidad', 'Lácteos', 'Unidad', 1, '7801234567892', 1190],
-            ['GAL-01', 'Galletas de Agua', 'unidad', 'Abarrotes', 'Paquete', 1, '7801234567893', 890],
-        ];
-
-        foreach ($prods as $p) {
-            $stmtP->execute([$empresa, $p[0], $p[1], $p[2], $p[3]]);
-            $pId = (int) $pdo->lastInsertId();
-            $stmtPres->execute([$pId, $p[4], $p[5], $p[6], $p[7]]);
-        }
-        echo "   [OK] Catálogo de prueba cargado con productos iniciales.\n";
-    }
-
     $pdo->commit();
+
+    echo "   [OK] Empresa, local 'centro', caja '1' y usuario administrador creados exitosamente.\n";
 
     // Actualizar .env con el usuario zylajdcb si no estaba
     $rutaEnv = '/home/zylajdcb/lite/.env';
