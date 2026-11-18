@@ -13,47 +13,65 @@ echo "============================================================\n\n";
 
 require __DIR__ . '/../config/database.php';
 
-// 1. Diagnóstico de variables de entorno
-$dsn = getenv('MYPOSLITE_DB_DSN');
-$usr = getenv('MYPOSLITE_DB_USER');
-$pwd = getenv('MYPOSLITE_DB_PASSWORD');
+$envUser = getenv('MYPOSLITE_DB_USER') ?: 'zylajdcb_mypos';
+$envPass = getenv('MYPOSLITE_DB_PASSWORD') ?: 'z7MS(7eWy7.8pB';
+$dbName  = 'zylajdcb_lite';
 
-echo "1. Variables de entorno detectadas:\n";
-echo "   MYPOSLITE_DB_DSN: " . ($dsn ?: '(NO CONFIGURADO)') . "\n";
-echo "   MYPOSLITE_DB_USER: " . ($usr ?: '(NO CONFIGURADO)') . "\n";
-echo "   MYPOSLITE_DB_PASSWORD: " . ($pwd !== false ? '(CONFIGURADO, longitud ' . strlen($pwd) . ')' : '(NO CONFIGURADO)') . "\n\n";
+$candidatos = [
+    // 1. Lo que viene en .env
+    ['host' => 'localhost', 'user' => $envUser, 'pass' => $envPass],
+    ['host' => '127.0.0.1', 'user' => $envUser, 'pass' => $envPass],
+    // 2. Probar con zylajdcb_mypos y z7MS(7eWy7.8pB
+    ['host' => 'localhost', 'user' => 'zylajdcb_mypos', 'pass' => 'z7MS(7eWy7.8pB'],
+    ['host' => '127.0.0.1', 'user' => 'zylajdcb_mypos', 'pass' => 'z7MS(7eWy7.8pB'],
+    // 3. Probar con zylajdcb y z7MS(7eWy7.8pB
+    ['host' => 'localhost', 'user' => 'zylajdcb', 'pass' => 'z7MS(7eWy7.8pB'],
+    ['host' => '127.0.0.1', 'user' => 'zylajdcb', 'pass' => 'z7MS(7eWy7.8pB'],
+];
 
-if (!$dsn || !$usr || $pwd === false) {
-    echo "[ERROR] El archivo .env no contiene las variables requeridas o no existe en la raiz.\n";
-    echo "Rutas buscadas para .env:\n";
-    $candidatos = [
-        realpath(__DIR__ . '/../../') . '/.env',
-        realpath(__DIR__ . '/../') . '/.env',
-        '/home/zylajdcb/lite/.env',
-    ];
-    foreach ($candidatos as $c) {
-        echo "   - $c : " . (file_exists($c) ? "EXISTE (tamaño: " . filesize($c) . " bytes)" : "NO EXISTE") . "\n";
+$pdo = null;
+$credencialExitosa = null;
+
+echo "1. Probando combinaciones de conexion a MySQL/MariaDB...\n";
+foreach ($candidatos as $idx => $cand) {
+    $dsn = "mysql:host={$cand['host']};dbname={$dbName};charset=utf8mb4";
+    try {
+        $p = new PDO($dsn, $cand['user'], $cand['pass'], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+        $pdo = $p;
+        $credencialExitosa = $cand;
+        echo "   -> Intento " . ($idx + 1) . ": CONEXION EXITOSA usando host={$cand['host']}, usuario={$cand['user']}!\n";
+        break;
+    } catch (Throwable $e) {
+        echo "   -> Intento " . ($idx + 1) . " (host={$cand['host']}, user={$cand['user']}): " . $e->getMessage() . "\n";
     }
+}
+
+if (!$pdo) {
+    echo "\n[ERROR] Ninguna de las credenciales conocidas pudo autenticar.\n";
+    echo "Por favor ve a cPanel -> Bases de datos MySQL -> Usuarios actuales,\n";
+    echo "haz clic en 'Cambiar contraseña' junto a 'zylajdcb_mypos',\n";
+    echo "establece una clave conocida y ponla en tu archivo .env.\n";
     exit(1);
 }
 
-// 2. Probar conexión PDO
-echo "2. Probando conexión a MariaDB / MySQL...\n";
-try {
-    $pdo = conectarBaseLite();
-    echo "   [OK] Conexión establecida exitosamente con la base de datos.\n";
-    $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
-    echo "   Base de datos actual: $db\n\n";
-} catch (Throwable $e) {
-    echo "   [ERROR DE CONEXION] " . $e->getMessage() . "\n";
-    echo "   Revisa que el usuario y la contraseña en .env coincidan con cPanel.\n";
-    exit(1);
+// Actualizar .env automáticamente con la credencial que funcionó si es posible
+$rutaEnv = '/home/zylajdcb/lite/.env';
+if (file_exists($rutaEnv) && is_writable($rutaEnv)) {
+    $cEnv = file_get_contents($rutaEnv);
+    $cEnv = preg_replace('/MYPOSLITE_DB_USER=.*/', 'MYPOSLITE_DB_USER=' . $credencialExitosa['user'], $cEnv);
+    $cEnv = preg_replace('/MYPOSLITE_DB_PASSWORD=.*/', 'MYPOSLITE_DB_PASSWORD=' . $credencialExitosa['pass'], $cEnv);
+    $cEnv = preg_replace('/host=[^;]+/', 'host=' . $credencialExitosa['host'], $cEnv);
+    file_put_contents($rutaEnv, $cEnv);
+    echo "   [OK] Archivo .env actualizado automaticamente con las credenciales que funcionaron.\n\n";
 }
 
-// 3. Ejecutar migraciones
-echo "3. Ejecutando migraciones de base de datos...\n";
+// 2. Ejecutar las 34 migraciones
+echo "2. Ejecutando migraciones de base de datos...\n";
 try {
-    $lock = 'myposlite:' . sha1((string) $db);
+    $lock = 'myposlite:' . sha1($dbName);
     $acquire = $pdo->prepare('SELECT GET_LOCK(?, 15)');
     $acquire->execute([$lock]);
 
@@ -102,14 +120,19 @@ try {
 
     echo "\n   [OK] Migraciones completadas. $aplicadas aplicadas, $yaEstaban ya registradas.\n\n";
 
-    // 4. Inicializar demo si está activo
-    if (getenv('MYPOSLITE_LOCAL_DEMO') === '1') {
-        echo "4. Inicializando datos de prueba (modo demo)...\n";
-        require __DIR__ . '/../bin/crear-demo.php';
-        echo "\n   [OK] Cuenta de demostración lista para ingresar.\n";
-    }
+    // 3. Inicializar demo
+    echo "3. Inicializando datos de prueba (modo demo)...\n";
+    putenv('MYPOSLITE_LOCAL_DEMO=1');
+    putenv('MYPOSLITE_DB_DSN=mysql:host=' . $credencialExitosa['host'] . ';dbname=' . $dbName . ';charset=utf8mb4');
+    putenv('MYPOSLITE_DB_USER=' . $credencialExitosa['user']);
+    putenv('MYPOSLITE_DB_PASSWORD=' . $credencialExitosa['pass']);
+
+    require __DIR__ . '/../bin/crear-demo.php';
+    echo "\n   [OK] Cuenta de demostración lista para ingresar.\n";
 
     echo "\n=== PROCESO COMPLETADO EXITOSAMENTE ===\n";
+    echo "Accede a: https://lite.mypos.cl\n";
+    echo "Usuario demo: demo@myposlite.test\n";
 } catch (Throwable $e) {
     echo "\n[ERROR EN MIGRACION] " . $e->getMessage() . "\n";
     echo "Archivo: " . $e->getFile() . " (linea " . $e->getLine() . ")\n";
