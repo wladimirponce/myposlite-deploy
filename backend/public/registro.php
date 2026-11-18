@@ -5,6 +5,7 @@ declare(strict_types=1);
 require __DIR__ . '/../config/database.php';
 require __DIR__ . '/../config/session.php';
 require __DIR__ . '/../src/SembradorCatalogo.php';
+require_once __DIR__ . '/../src/Emision.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -26,10 +27,28 @@ if (($_SERVER['HTTP_X_MYPOSLITE_REQUEST'] ?? '') !== '1') {
 }
 
 try {
-    $raw = file_get_contents('php://input', false, null, 0, 8192);
-    $input = json_decode((string) $raw, true, 8, JSON_THROW_ON_ERROR);
-    if (!is_array($input)) {
-        responder(400, ['error' => 'Datos inválidos.']);
+    $input = [];
+    $pfxBytes = '';
+    $claveCertificado = '';
+
+    // Soporte para multipart/form-data (con subida de archivo .pfx) y application/json
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (str_contains($contentType, 'multipart/form-data') || !empty($_POST)) {
+        $input = $_POST;
+        if (!empty($_FILES['certificado']['tmp_name']) && is_uploaded_file($_FILES['certificado']['tmp_name'])) {
+            $pfxBytes = (string) file_get_contents($_FILES['certificado']['tmp_name']);
+        }
+        $claveCertificado = trim((string) ($_POST['clave_certificado'] ?? ''));
+    } else {
+        $raw = file_get_contents('php://input', false, null, 0, 1048576); // hasta 1MB
+        $input = json_decode((string) $raw, true, 8, JSON_THROW_ON_ERROR);
+        if (!is_array($input)) {
+            responder(400, ['error' => 'Datos inválidos.']);
+        }
+        if (!empty($input['certificado_base64'])) {
+            $pfxBytes = (string) base64_decode((string) $input['certificado_base64']);
+        }
+        $claveCertificado = trim((string) ($input['clave_certificado'] ?? ''));
     }
 
     $nombreUsuario = trim((string) ($input['nombre'] ?? ''));
@@ -56,6 +75,30 @@ try {
     }
     if (!in_array($rubro, ['minimarket', 'farmacia', 'otro'], true)) {
         $rubro = 'otro';
+    }
+
+    // Si viene certificado, validar la contraseña antes de crear nada en la base de datos
+    $datosCertificado = null;
+    if ($pfxBytes !== '') {
+        if ($claveCertificado === '') {
+            responder(400, ['error' => 'Si adjuntas el certificado digital, debes ingresar su contraseña.']);
+        }
+        if (!openssl_pkcs12_read($pfxBytes, $paqueteCert, $claveCertificado)) {
+            responder(400, ['error' => 'No se pudo abrir el certificado digital. Verifica que el archivo sea .pfx o .p12 y que la contraseña sea correcta.']);
+        }
+        $parsed = openssl_x509_parse($paqueteCert['cert']);
+        if (!is_array($parsed) || ($parsed['validTo_time_t'] ?? 0) <= time()) {
+            responder(400, ['error' => 'El certificado digital está vencido.']);
+        }
+        $rutTitular = RutCertificado::extraer($paqueteCert['cert']);
+        if (!$rutTitular) {
+            responder(400, ['error' => 'El certificado digital no contiene un RUT de persona válido.']);
+        }
+        $datosCertificado = [
+            'nombre' => (string) ($parsed['subject']['CN'] ?? $rutTitular),
+            'rut' => $rutTitular,
+            'validoHasta' => date('Y-m-d', $parsed['validTo_time_t']),
+        ];
     }
 
     $db = conectarBaseLite();
@@ -91,7 +134,23 @@ try {
     $db->prepare('INSERT INTO membresias (empresa_id, usuario_id, rol_codigo, activa) VALUES (?, ?, ?, 1)')
         ->execute([$empresaId, $usuarioId, 'administrador']);
 
-    // 5. Sembrar catálogo según rubro
+    // 5. Configurar emisores DTE base
+    $stmtEmisor = $db->prepare('INSERT INTO dte_emisores 
+        (empresa_id, ambiente, giro, direccion, comuna, numero_resolucion, fecha_resolucion, actualizado_por)
+        VALUES (?, ?, ?, ?, ?, 0, CURDATE(), ?)
+        ON DUPLICATE KEY UPDATE giro = VALUES(giro)');
+    $stmtEmisor->execute([$empresaId, 'certificacion', 'Comercio al por menor', 'Casa Matriz', 'Santiago', $usuarioId]);
+    $stmtEmisor->execute([$empresaId, 'produccion', 'Comercio al por menor', 'Casa Matriz', 'Santiago', $usuarioId]);
+
+    // 6. Si se adjuntó certificado digital, guardarlo de inmediato en ambos ambientes
+    $certGuardado = false;
+    if ($pfxBytes !== '' && $claveCertificado !== '') {
+        guardarCertificadoDte($db, (string) $empresaId, (string) $usuarioId, 'certificacion', $pfxBytes, $claveCertificado);
+        guardarCertificadoDte($db, (string) $empresaId, (string) $usuarioId, 'produccion', $pfxBytes, $claveCertificado);
+        $certGuardado = true;
+    }
+
+    // 7. Sembrar catálogo según rubro
     $prodsSembrados = 0;
     if ($rubro === 'farmacia' || $rubro === 'minimarket') {
         $prodsSembrados = SembradorCatalogo::sembrar($db, $empresaId, $rubro);
@@ -99,7 +158,7 @@ try {
 
     $db->commit();
 
-    // 6. Iniciar sesión automáticamente
+    // 8. Iniciar sesión automáticamente
     if (iniciarSesionLite()) {
         $_SESSION['usuario_id'] = (string) $usuarioId;
         $_SESSION['actividad'] = time();
@@ -110,7 +169,11 @@ try {
         'empresa_id' => $empresaId,
         'rubro' => $rubro,
         'productos_sembrados' => $prodsSembrados,
-        'mensaje' => 'Comercio registrado con éxito.',
+        'certificado_cargado' => $certGuardado,
+        'titular_certificado' => $datosCertificado,
+        'mensaje' => $certGuardado
+            ? '¡Comercio registrado con éxito! Tu certificado digital quedó vinculado para la certificación de boletas.'
+            : '¡Comercio registrado con éxito! Ya puedes comenzar a utilizar tu punto de venta.',
     ]);
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) {
