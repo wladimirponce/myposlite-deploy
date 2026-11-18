@@ -1,0 +1,47 @@
+{
+  "name": "MyPOS Lite - Punto de Venta & Caja",
+  "short_name": "MyPOS Lite",
+  "description": "Punto de Venta y Facturación Electrónica DTE offline resiliente para teléfonos, tablets y computadores.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1520",
+  "theme_color": "#28558f",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Punto de Venta (POS)",
+      "url": "/#pos",
+      "description": "Acceso directo a ventas rápidas"
+    },
+    {
+      "name": "Control de Caja",
+      "url": "/#caja",
+      "description": "Ver turno y arqueo de caja"
+    }
+  ]
+}

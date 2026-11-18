@@ -10,13 +10,21 @@ RewriteRule ^database - [F,L]
 # 2. Ruteo de API: /api/*.php -> backend/public/*.php
 RewriteRule ^api/([a-zA-Z0-9_\-]+)\.php$ backend/public/$1.php [L,QSA]
 
-# 3. Cache para assets de Vite
+# 3. Cache para assets y reglas de PWA
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"
   ExpiresByType application/javascript "access plus 1 year"
   ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
 </IfModule>
+
+# PWA: No cachear sw.js para que las actualizaciones se detecten de inmediato
+<Files "sw.js">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+  </IfModule>
+</Files>
 
 # 4. SPA Fallback: todas las demás rutas sirven index.html
 RewriteCond %{REQUEST_FILENAME} !-f

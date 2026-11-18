@@ -6,9 +6,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#28558f">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <title>MyPOS Lite</title>
-    <script type="module" crossorigin src="/assets/index-DzwsfJyQ.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-tQvVkJop.css">
+    <script>
+      // Registro automático del Service Worker PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            console.log('[PWA] Service Worker registrado con alcance:', reg.scope);
+          }).catch(function(err) {
+            console.warn('[PWA] Falla al registrar Service Worker:', err);
+          });
+        });
+      }
+    </script>
+    <script type="module" crossorigin src="/assets/index-D4uojioA.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-fR3aXEW-.css">
   </head>
   <body>
     <div id="root"></div>
