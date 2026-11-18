@@ -11,29 +11,24 @@ echo "============================================================\n";
 echo "   MYPOS LITE - DIAGNOSTICO Y MIGRACIONES DE BASE DE DATOS\n";
 echo "============================================================\n\n";
 
-require __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
-$envUser = getenv('MYPOSLITE_DB_USER') ?: 'zylajdcb_mypos';
+$envUser = getenv('MYPOSLITE_DB_USER') ?: 'zylajdcb';
 $envPass = getenv('MYPOSLITE_DB_PASSWORD') ?: 'z7MS(7eWy7.8pB';
 $dbName  = 'zylajdcb_lite';
 
 $candidatos = [
-    // 1. Lo que viene en .env
-    ['host' => 'localhost', 'user' => $envUser, 'pass' => $envPass],
-    ['host' => '127.0.0.1', 'user' => $envUser, 'pass' => $envPass],
-    // 2. Probar con zylajdcb_mypos y z7MS(7eWy7.8pB
-    ['host' => 'localhost', 'user' => 'zylajdcb_mypos', 'pass' => 'z7MS(7eWy7.8pB'],
-    ['host' => '127.0.0.1', 'user' => 'zylajdcb_mypos', 'pass' => 'z7MS(7eWy7.8pB'],
-    // 3. Probar con zylajdcb y z7MS(7eWy7.8pB
     ['host' => 'localhost', 'user' => 'zylajdcb', 'pass' => 'z7MS(7eWy7.8pB'],
+    ['host' => 'localhost', 'user' => $envUser, 'pass' => $envPass],
     ['host' => '127.0.0.1', 'user' => 'zylajdcb', 'pass' => 'z7MS(7eWy7.8pB'],
+    ['host' => '127.0.0.1', 'user' => $envUser, 'pass' => $envPass],
 ];
 
 $pdo = null;
 $credencialExitosa = null;
 
-echo "1. Probando combinaciones de conexion a MySQL/MariaDB...\n";
-foreach ($candidatos as $idx => $cand) {
+echo "1. Conectando a MariaDB / MySQL...\n";
+foreach ($candidatos as $cand) {
     $dsn = "mysql:host={$cand['host']};dbname={$dbName};charset=utf8mb4";
     try {
         $p = new PDO($dsn, $cand['user'], $cand['pass'], [
@@ -42,34 +37,20 @@ foreach ($candidatos as $idx => $cand) {
         ]);
         $pdo = $p;
         $credencialExitosa = $cand;
-        echo "   -> Intento " . ($idx + 1) . ": CONEXION EXITOSA usando host={$cand['host']}, usuario={$cand['user']}!\n";
+        echo "   [OK] Conexión establecida usando usuario {$cand['user']} en {$cand['host']}.\n\n";
         break;
     } catch (Throwable $e) {
-        echo "   -> Intento " . ($idx + 1) . " (host={$cand['host']}, user={$cand['user']}): " . $e->getMessage() . "\n";
+        // continuar
     }
 }
 
 if (!$pdo) {
-    echo "\n[ERROR] Ninguna de las credenciales conocidas pudo autenticar.\n";
-    echo "Por favor ve a cPanel -> Bases de datos MySQL -> Usuarios actuales,\n";
-    echo "haz clic en 'Cambiar contraseña' junto a 'zylajdcb_mypos',\n";
-    echo "establece una clave conocida y ponla en tu archivo .env.\n";
+    echo "[ERROR] No se pudo conectar a la base de datos con las credenciales.\n";
     exit(1);
 }
 
-// Actualizar .env automáticamente con la credencial que funcionó si es posible
-$rutaEnv = '/home/zylajdcb/lite/.env';
-if (file_exists($rutaEnv) && is_writable($rutaEnv)) {
-    $cEnv = file_get_contents($rutaEnv);
-    $cEnv = preg_replace('/MYPOSLITE_DB_USER=.*/', 'MYPOSLITE_DB_USER=' . $credencialExitosa['user'], $cEnv);
-    $cEnv = preg_replace('/MYPOSLITE_DB_PASSWORD=.*/', 'MYPOSLITE_DB_PASSWORD=' . $credencialExitosa['pass'], $cEnv);
-    $cEnv = preg_replace('/host=[^;]+/', 'host=' . $credencialExitosa['host'], $cEnv);
-    file_put_contents($rutaEnv, $cEnv);
-    echo "   [OK] Archivo .env actualizado automaticamente con las credenciales que funcionaron.\n\n";
-}
-
 // 2. Ejecutar las 34 migraciones
-echo "2. Ejecutando migraciones de base de datos...\n";
+echo "2. Verificando y aplicando migraciones...\n";
 try {
     $lock = 'myposlite:' . sha1($dbName);
     $acquire = $pdo->prepare('SELECT GET_LOCK(?, 15)');
@@ -118,23 +99,96 @@ try {
         $aplicadas++;
     }
 
-    echo "\n   [OK] Migraciones completadas. $aplicadas aplicadas, $yaEstaban ya registradas.\n\n";
+    echo "   [OK] Migraciones al dia. $aplicadas aplicadas ahora, $yaEstaban ya registradas.\n\n";
 
-    // 3. Inicializar demo
-    echo "3. Inicializando datos de prueba (modo demo)...\n";
-    putenv('MYPOSLITE_LOCAL_DEMO=1');
-    putenv('MYPOSLITE_DB_DSN=mysql:host=' . $credencialExitosa['host'] . ';dbname=' . $dbName . ';charset=utf8mb4');
-    putenv('MYPOSLITE_DB_USER=' . $credencialExitosa['user']);
-    putenv('MYPOSLITE_DB_PASSWORD=' . $credencialExitosa['pass']);
+    // 3. Inicializar empresa de demostración y usuario
+    echo "3. Inicializando empresa de demostración y usuario piloto...\n";
+    $correo = 'demo@myposlite.test';
+    $clavePlana = 'Demo12345678';
+    $rut = '999999999';
 
-    require __DIR__ . '/../bin/crear-demo.php';
-    echo "\n   [OK] Cuenta de demostración lista para ingresar.\n";
+    $pdo->beginTransaction();
+    
+    // Empresa
+    $stmt = $pdo->prepare('INSERT INTO empresas (rut, razon_social, es_demo) VALUES (?, ?, 1)
+        ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)');
+    $stmt->execute([$rut, 'Comercio de demostración']);
+    $empresa = (int) $pdo->lastInsertId();
 
-    echo "\n=== PROCESO COMPLETADO EXITOSAMENTE ===\n";
-    echo "Accede a: https://lite.mypos.cl\n";
-    echo "Usuario demo: demo@myposlite.test\n";
+    // Local y caja
+    $pdo->prepare('INSERT INTO locales (empresa_id, codigo, nombre) VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE codigo = VALUES(codigo)')->execute([$empresa, 'centro', 'Local Centro']);
+    $pdo->prepare('INSERT INTO cajas (empresa_id, local_codigo, codigo, nombre) VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE codigo = VALUES(codigo)')->execute([$empresa, 'centro', '1', 'Caja 1']);
+
+    // Usuario demo
+    $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE correo = ?');
+    $stmt->execute([$correo]);
+    $userId = $stmt->fetchColumn();
+    $hash = password_hash($clavePlana, PASSWORD_DEFAULT);
+
+    if ($userId !== false) {
+        $pdo->prepare('UPDATE usuarios SET clave_hash = ? WHERE id = ?')->execute([$hash, $userId]);
+    } else {
+        $pdo->prepare('INSERT INTO usuarios (correo, nombre, clave_hash) VALUES (?, ?, ?)')
+            ->execute([$correo, 'Administrador Demo', $hash]);
+        $userId = (int) $pdo->lastInsertId();
+    }
+
+    // Membresía
+    $pdo->prepare('INSERT INTO membresias (empresa_id, usuario_id, rol_codigo) VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE rol_codigo = VALUES(rol_codigo)')->execute([$empresa, $userId, 'administrador']);
+
+    // Productos de prueba
+    $numProd = (int) $pdo->query("SELECT COUNT(*) FROM productos WHERE empresa_id = $empresa")->fetchColumn();
+    if ($numProd === 0) {
+        $stmtP = $pdo->prepare('INSERT INTO productos (empresa_id, sku, nombre, unidad_base, afecto_iva, categoria, activo) VALUES (?, ?, ?, ?, 1, ?, 1)');
+        $stmtPres = $pdo->prepare('INSERT INTO producto_presentaciones (producto_id, nombre, factor, codigo_barra, precio, activo) VALUES (?, ?, ?, ?, ?, 1)');
+
+        $prods = [
+            ['BEB-01', 'Bebida Cola 1.5L', 'unidad', 'Bebidas', 'Unidad', 1, '7801234567890', 1690],
+            ['PAN-01', 'Pan Marraqueta', 'kg', 'Panadería', 'Kilo', 1, '7801234567891', 1990],
+            ['LEC-01', 'Leche Entera 1L', 'unidad', 'Lácteos', 'Unidad', 1, '7801234567892', 1190],
+            ['GAL-01', 'Galletas de Agua', 'unidad', 'Abarrotes', 'Paquete', 1, '7801234567893', 890],
+        ];
+
+        foreach ($prods as $p) {
+            $stmtP->execute([$empresa, $p[0], $p[1], $p[2], $p[3]]);
+            $pId = (int) $pdo->lastInsertId();
+            $stmtPres->execute([$pId, $p[4], $p[5], $p[6], $p[7]]);
+        }
+        echo "   [OK] Catálogo de prueba cargado con productos iniciales.\n";
+    }
+
+    $pdo->commit();
+
+    // Actualizar .env con el usuario zylajdcb si no estaba
+    $rutaEnv = '/home/zylajdcb/lite/.env';
+    if (file_exists($rutaEnv) && is_writable($rutaEnv)) {
+        $cEnv = file_get_contents($rutaEnv);
+        $cEnv = preg_replace('/MYPOSLITE_DB_USER=.*/', 'MYPOSLITE_DB_USER=zylajdcb', $cEnv);
+        $cEnv = preg_replace('/MYPOSLITE_DB_PASSWORD=.*/', 'MYPOSLITE_DB_PASSWORD=z7MS(7eWy7.8pB', $cEnv);
+        file_put_contents($rutaEnv, $cEnv);
+    }
+
+    echo "\n============================================================\n";
+    echo "   ¡DESPLIEGUE A PRODUCCION COMPLETADO CON EXITO!\n";
+    echo "============================================================\n\n";
+    echo "URL de la aplicacion: https://lite.mypos.cl\n\n";
+    echo "Credenciales de acceso:\n";
+    echo "   Correo:      $correo\n";
+    echo "   Contraseña:  $clavePlana\n\n";
+    echo "Empresa: Comercio de demostracion\n";
+    echo "Local:   Local Centro\n";
+    echo "Caja:    Caja 1\n";
+    echo "Modo:    Demostracion / Piloto (Tickets internos, sin envio al SII)\n";
+    echo "============================================================\n";
+
 } catch (Throwable $e) {
-    echo "\n[ERROR EN MIGRACION] " . $e->getMessage() . "\n";
+    if ($pdo && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    echo "\n[ERROR] " . $e->getMessage() . "\n";
     echo "Archivo: " . $e->getFile() . " (linea " . $e->getLine() . ")\n";
     exit(1);
 }

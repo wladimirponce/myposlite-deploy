@@ -42,22 +42,24 @@ if (!function_exists('cargarEnvSiExiste')) {
     cargarEnvSiExiste();
 }
 
-function conectarBaseLite(): PDO
-{
-    $dsn = getenv('MYPOSLITE_DB_DSN');
-    $usuario = getenv('MYPOSLITE_DB_USER');
-    $clave = getenv('MYPOSLITE_DB_PASSWORD');
+if (!function_exists('conectarBaseLite')) {
+    function conectarBaseLite(): PDO
+    {
+        $dsn = getenv('MYPOSLITE_DB_DSN');
+        $usuario = getenv('MYPOSLITE_DB_USER');
+        $clave = getenv('MYPOSLITE_DB_PASSWORD');
 
-    if ($dsn === false || !str_starts_with($dsn, 'mysql:') || !$usuario || $clave === false) {
-        throw new RuntimeException('Configure las variables MYPOSLITE_DB_DSN, MYPOSLITE_DB_USER y MYPOSLITE_DB_PASSWORD.');
+        if ($dsn === false || !str_starts_with($dsn, 'mysql:') || !$usuario || $clave === false) {
+            throw new RuntimeException('Configure las variables MYPOSLITE_DB_DSN, MYPOSLITE_DB_USER y MYPOSLITE_DB_PASSWORD.');
+        }
+
+        $pdo = new PDO($dsn, $usuario, $clave, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            Pdo\Mysql::ATTR_MULTI_STATEMENTS => false,
+        ]);
+        $pdo->exec("SET time_zone = '+00:00'");
+
+        return $pdo;
     }
-
-    $pdo = new PDO($dsn, $usuario, $clave, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_EMULATE_PREPARES => false,
-        Pdo\Mysql::ATTR_MULTI_STATEMENTS => false,
-    ]);
-    $pdo->exec("SET time_zone = '+00:00'");
-
-    return $pdo;
 }
