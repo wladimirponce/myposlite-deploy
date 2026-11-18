@@ -12,14 +12,17 @@ if (getenv('MYPOSLITE_LOCAL_DEMO') !== '1') {
 $db = conectarBaseLite();
 $correo = 'demo@myposlite.test';
 $rut = '999999999';
-// MYPOSLITE_DEMO_CLAVE fija una contraseña conocida; si no se indica, se genera una al azar.
-$clave = getenv('MYPOSLITE_DEMO_CLAVE') ?: bin2hex(random_bytes(9));
+// MYPOSLITE_DEMO_CLAVE fija una contraseña conocida; por defecto usa Demo12345678.
+$clave = getenv('MYPOSLITE_DEMO_CLAVE') ?: 'Demo12345678';
 if (strlen($clave) < 12 || strlen($clave) > 72 || str_contains($clave, "\0")) {
     fwrite(STDERR, "La contraseña de demostración debe tener entre 12 y 72 caracteres.\n");
     exit(1);
 }
 $db->beginTransaction();
 try {
+    // Desbloquear cualquier intento fallido previo en modo demo
+    $cuentaHash = hash('sha256', $correo);
+    $db->prepare('DELETE FROM intentos_sesion WHERE cuenta_hash = ?')->execute([$cuentaHash]);
     $insertarEmpresa = $db->prepare('INSERT INTO empresas (rut, razon_social, es_demo)
         VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)');
     $insertarEmpresa->execute([$rut, 'Comercio de demostración']);
