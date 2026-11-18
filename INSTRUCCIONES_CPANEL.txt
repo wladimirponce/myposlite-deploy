@@ -1,0 +1,46 @@
+======================================================================
+MYPOS LITE - GUIA DE INSTALACION EN CPANEL (lite.mypos.cl)
+======================================================================
+
+PASO 1: Crear Subdominio en cPanel
+  1. En cPanel, abre "Subdominios" o "Dominios".
+  2. Crea el subdominio: lite.mypos.cl
+  3. Directorio raíz (Document Root): /home/zylajdcb/lite.mypos.cl
+
+PASO 2: Crear la Base de Datos en cPanel
+  1. Abre "Bases de datos MySQL".
+  2. Crea la base de datos: zylajdcb_lite
+  3. Crea un usuario: zylajdcb_liteuser con contraseña segura.
+  4. Asigna el usuario a la base de datos con TODOS LOS PRIVILEGIOS.
+
+PASO 3: Clonar el Repositorio con cPanel Git Version Control
+  1. Abre "Git Version Control" en cPanel.
+  2. Haz clic en "Create".
+  3. Clone URL: https://github.com/wladimirponce/myposlite-deploy.git
+  4. Repository Path: /home/zylajdcb/repositories/myposlite-deploy
+  5. Repository Name: myposlite-deploy
+  6. Haz clic en "Create".
+  7. En la pestaña "Deploy", haz clic en "Deploy HEAD Commit".
+     (El archivo .cpanel.yml copiará automáticamente todo a /home/zylajdcb/lite.mypos.cl).
+
+PASO 4: Configurar el archivo .env
+  1. Abre el Administrador de Archivos de cPanel y ve a:
+     /home/zylajdcb/lite.mypos.cl/
+  2. Copia .env.example como .env
+  3. Ingresa el nombre de tu base de datos, usuario y contraseña creados en el Paso 2.
+
+PASO 5: Ejecutar las 34 Migraciones y Crear la Cuenta Demo
+  Opción A (desde el navegador):
+    Abre https://lite.mypos.cl/api/migrar.php?token=TU_MYPOSLITE_DTE_SECRET
+    (El token está en tu .env).
+    Verás en pantalla cómo se aplican las 34 migraciones y se crea la cuenta demo.
+
+  Opción B (desde la Terminal de cPanel):
+    cd /home/zylajdcb/lite.mypos.cl
+    php database/migrate.php
+    php backend/bin/crear-demo.php
+
+PASO 6: Tarea Programada (Cron Job) para Segundo Plano (Opcional)
+  En cPanel -> Trabajos de Cron, agrega cada minuto:
+  * * * * * /usr/local/bin/php /home/zylajdcb/lite.mypos.cl/backend/bin/scheduler.php >/dev/null 2>&1
+======================================================================

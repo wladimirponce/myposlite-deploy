@@ -1,0 +1,24 @@
+Options -Indexes
+RewriteEngine On
+
+# 1. Seguridad: bloquear acceso a archivos y carpetas sensibles
+RewriteRule ^\.env - [F,L]
+RewriteRule ^\.git - [F,L]
+RewriteRule ^backend/(config|src|bin) - [F,L]
+RewriteRule ^database - [F,L]
+
+# 2. Ruteo de API: /api/*.php -> backend/public/*.php
+RewriteRule ^api/([a-zA-Z0-9_\-]+)\.php$ backend/public/$1.php [L,QSA]
+
+# 3. Cache para assets de Vite
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+</IfModule>
+
+# 4. SPA Fallback: todas las demás rutas sirven index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

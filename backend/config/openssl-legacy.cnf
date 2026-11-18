@@ -1,0 +1,2 @@
+# Copiado de MyPOS, admin/openssl_legacy.cnf, revisión 0db4a67.
+# Activa el proveedor legacy de OpenSSL 3 para abrir certificados .pfx con RC2 o 3DES, comunes en Chile.

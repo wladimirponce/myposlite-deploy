@@ -1,0 +1,11 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/zylajdcb/lite.mypos.cl
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/assets $DEPLOYPATH/backend $DEPLOYPATH/database
+    - /bin/cp -R assets $DEPLOYPATH/
+    - /bin/cp -R backend $DEPLOYPATH/
+    - /bin/cp -R database $DEPLOYPATH/
+    - /bin/cp index.html $DEPLOYPATH/index.html
+    - /bin/cp .htaccess $DEPLOYPATH/.htaccess
