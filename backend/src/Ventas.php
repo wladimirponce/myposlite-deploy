@@ -248,12 +248,13 @@ function registrarVenta(PDO $db, string $empresa, string $local, string $usuario
             . number_format($montos['total'], 0, ',', '.') . '.');
     }
 
+    $soloTicket = ($input['soloTicket'] ?? false) === true;
     $demo = $db->prepare('SELECT es_demo FROM empresas WHERE id = ?');
     $demo->execute([$empresa]);
     $esDemo = (bool) $demo->fetchColumn();
-    $emitir = tipoHabilitadoDte($db, $empresa, $tipo);
-    if (!$emitir && !$esDemo) {
-        throw new RuntimeException('Las boletas no están habilitadas en producción. Complete la certificación en Documentos tributarios.', 409);
+    $emitir = !$soloTicket && tipoHabilitadoDte($db, $empresa, $tipo);
+    if (!$soloTicket && !$emitir && !$esDemo) {
+        throw new RuntimeException('Las boletas no están habilitadas en producción. Para vender antes de certificarse, seleccione "Solo Ticket" o complete la certificación en Documentos tributarios.', 409);
     }
     // Certificado y emisor se abren antes de la transacción: si faltan, no se toma ningún bloqueo.
     $emisor = $emitir ? emisorDte($db, $empresa, 'produccion') : null;

@@ -24,7 +24,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     ['db' => $db, 'empresa' => $empresa, 'local' => $local, 'usuario' => $usuario, 'permisos' => $permisos] = contextoAutorizado();
-    if (rawurldecode($_SERVER['HTTP_X_MYPOSLITE_LOCAL'] ?? '') !== $local) {
+    $localRequerido = !empty($_SERVER['HTTP_X_MYPOSLITE_LOCAL'])
+        ? rawurldecode($_SERVER['HTTP_X_MYPOSLITE_LOCAL'])
+        : ($_GET['local'] ?? $local);
+    if ($localRequerido !== $local) {
         responder(409, ['error' => 'Cambió el local activo.']);
     }
     if (!array_intersect(['pos.vender', 'caja.supervisar', 'operacion.consultar'], $permisos)) {
@@ -46,9 +49,6 @@ try {
     }
     if (!array_intersect(['caja.supervisar', 'operacion.consultar'], $permisos)) {
         exigirCaja($db, $empresa, $local, $usuario, $permisos, $datos['caja_codigo']);
-    }
-    if ($datos['documento_id'] !== null) {
-        responder(409, ['error' => 'Para esta venta descargue su documento tributario.']);
     }
 
     $venta = detalleVenta($db, $empresa, $id);
