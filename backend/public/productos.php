@@ -83,7 +83,8 @@ try {
             $presentacionId = (string) $encontrada['id'];
             $cursor = (string) ($encontrada['producto_id'] - 1);
         }
-        $limite = $codigo === null ? 51 : 1;
+        $tamanoPagina = isset($_GET['limite']) ? min(1000, max(1, (int) $_GET['limite'])) : 500;
+        $limite = $codigo === null ? ($tamanoPagina + 1) : 1;
         $cols = SchemaHelper::asegurarColumnasProductos($db);
         $campoImg = in_array('imagen_url', $cols, true) ? 'p.imagen_url' : 'NULL AS imagen_url';
         $campoPrincipio = in_array('principio_activo', $cols, true) ? 'p.principio_activo' : 'NULL AS principio_activo';
@@ -99,7 +100,7 @@ try {
             WHERE p.empresa_id = ? AND p.id > ? ORDER BY p.id LIMIT {$limite}");
         $query->execute([$local, $empresa, $cursor]);
         $productos = $query->fetchAll(PDO::FETCH_ASSOC);
-        $hayMas = count($productos) === 51;
+        $hayMas = count($productos) > $tamanoPagina;
         if ($hayMas) {
             array_pop($productos);
         }

@@ -38,6 +38,13 @@ final class SembradorCatalogo
         // 1. Asegurar esquema en la base de datos (auto-reparación y compatibilidad multi-rubro)
         $colsDisponibles = SchemaHelper::asegurarColumnasProductos($db);
 
+        // Eliminar productos demo por defecto (Cafetería/Pastelería DEMO-*) de esta empresa
+        try {
+            $db->prepare("DELETE FROM productos WHERE empresa_id = ? AND sku LIKE 'DEMO-%'")->execute([$empresaId]);
+        } catch (\Throwable $e) {
+            // Continuar si tienen dependencias
+        }
+
         // 2. Obtener y crear categorías únicas
         $categoriasUnicas = [];
         foreach ($items as $item) {
