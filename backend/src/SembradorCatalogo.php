@@ -51,12 +51,14 @@ final class SembradorCatalogo
 
         // 2. Sentencias preparadas para productos y presentaciones
         $stmtProd = $db->prepare('INSERT INTO productos 
-            (empresa_id, sku, nombre, unidad_base, afecto_iva, verificar_edad, categoria_id, imagen_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, sku, nombre, unidad_base, afecto_iva, verificar_edad, categoria_id, imagen_url, principio_activo, laboratorio)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
                 nombre = VALUES(nombre),
                 categoria_id = VALUES(categoria_id),
-                imagen_url = VALUES(imagen_url)');
+                imagen_url = VALUES(imagen_url),
+                principio_activo = VALUES(principio_activo),
+                laboratorio = VALUES(laboratorio)');
 
         $stmtPres = $db->prepare('INSERT INTO producto_presentaciones
             (empresa_id, producto_id, nombre, codigo_barras, equivalencia, precio)
@@ -80,7 +82,10 @@ final class SembradorCatalogo
             $afecto = !empty($it['afecto_iva']) ? 1 : 0;
             $img = !empty($it['imagen_url']) ? (string) $it['imagen_url'] : null;
 
-            $stmtProd->execute([$empresaId, $sku, $nombre, $unidad, $afecto, 0, $catId, $img]);
+            $pActivo = !empty($it['principio_activo']) ? (string) $it['principio_activo'] : null;
+            $laboratorio = !empty($it['laboratorio']) ? (string) $it['laboratorio'] : null;
+
+            $stmtProd->execute([$empresaId, $sku, $nombre, $unidad, $afecto, 0, $catId, $img, $pActivo, $laboratorio]);
             
             $stmtGetId->execute([$empresaId, $sku]);
             $prodId = $stmtGetId->fetchColumn();

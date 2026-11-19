@@ -63,6 +63,20 @@ function guardarProducto(PDO $db, string $empresa, string $local, string $id, ar
     if (array_key_exists('proveedorId', $input)) {
         $opcionales['proveedor_habitual_id'] = $proveedor;
     }
+    $principioActivo = $input['principioActivo'] ?? null;
+    if ($principioActivo !== null && (!is_string($principioActivo) || strlen(trim($principioActivo)) > 255)) {
+        throw new InvalidArgumentException('Revise el principio activo.');
+    }
+    if (array_key_exists('principioActivo', $input)) {
+        $opcionales['principio_activo'] = $principioActivo === null || trim($principioActivo) === '' ? null : trim($principioActivo);
+    }
+    $laboratorio = $input['laboratorio'] ?? null;
+    if ($laboratorio !== null && (!is_string($laboratorio) || strlen(trim($laboratorio)) > 100)) {
+        throw new InvalidArgumentException('Revise el laboratorio o marca.');
+    }
+    if (array_key_exists('laboratorio', $input)) {
+        $opcionales['laboratorio'] = $laboratorio === null || trim($laboratorio) === '' ? null : trim($laboratorio);
+    }
     $cambiaMinimo = array_key_exists('minimoLocal', $input);
     $minimo = $input['minimoLocal'] ?? null;
     if ($minimo !== null && (!is_string($minimo) || !preg_match('/^\d{1,12}(?:\.\d{1,6})?$/D', $minimo))) {

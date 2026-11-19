@@ -84,7 +84,7 @@ try {
         }
         $limite = $codigo === null ? 51 : 1;
         $query = $db->prepare('SELECT p.id, p.sku, p.nombre, p.unidad_base, p.afecto_iva, p.verificar_edad,
-                   p.revision, p.imagen_url, c.nombre AS categoria, pm.minimo AS minimo_local, p.impuesto_codigo,
+                   p.revision, p.imagen_url, p.principio_activo, p.laboratorio, c.nombre AS categoria, pm.minimo AS minimo_local, p.impuesto_codigo,
                    p.costo, p.margen_minimo, p.proveedor_habitual_id, pr.razon_social AS proveedor_habitual
             FROM productos p
             LEFT JOIN categorias_producto c ON c.empresa_id = p.empresa_id AND c.id = p.categoria_id
