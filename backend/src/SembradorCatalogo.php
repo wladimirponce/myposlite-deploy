@@ -18,6 +18,8 @@ final class SembradorCatalogo
         $archivo = match ($rubro) {
             'farmacia' => dirname(__DIR__, 2) . '/storage/catalogos_maestros/catalogo_farmacia.json',
             'minimarket' => dirname(__DIR__, 2) . '/storage/catalogos_maestros/catalogo_minimarket.json',
+            'botilleria' => dirname(__DIR__, 2) . '/storage/catalogos_maestros/catalogo_botilleria.json',
+            'ferreteria' => dirname(__DIR__, 2) . '/storage/catalogos_maestros/catalogo_ferreteria.json',
             default => null,
         };
 
