@@ -5,6 +5,7 @@ declare(strict_types=1);
 require __DIR__ . '/../config/database.php';
 require __DIR__ . '/../config/session.php';
 require __DIR__ . '/../src/AccesoMaestros.php';
+require __DIR__ . '/../src/SchemaHelper.php';
 require __DIR__ . '/../src/SembradorCatalogo.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -52,9 +53,14 @@ try {
         responder(400, ['error' => 'Seleccione al menos un rubro válido: farmacia, minimarket, botilleria o ferreteria.']);
     }
 
-    // Actualizar el rubro en la empresa (puede ser compuesto si son varios)
-    $stmtRubro = $acceso['db']->prepare('UPDATE empresas SET rubro = ? WHERE id = ?');
-    $stmtRubro->execute([implode(',', $rubros), $acceso['empresa']]);
+    // Asegurar columnas y actualizar el rubro en la empresa (puede ser compuesto si son varios)
+    SchemaHelper::asegurarColumnasProductos($acceso['db']);
+    try {
+        $stmtRubro = $acceso['db']->prepare('UPDATE empresas SET rubro = ? WHERE id = ?');
+        $stmtRubro->execute([implode(',', $rubros), $acceso['empresa']]);
+    } catch (\Throwable $e) {
+        // Continuar si la columna no pudo actualizarse
+    }
 
     $totalGeneral = 0;
     $detalle = [];

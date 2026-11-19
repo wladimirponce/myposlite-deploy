@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/SchemaHelper.php';
+
 function campo(mixed $value, string $label, int $max): string
 {
     if (!is_string($value) || trim($value) === '' || strlen(trim($value)) > $max) {
@@ -151,9 +153,18 @@ function guardarProducto(PDO $db, string $empresa, string $local, string $id, ar
     }
     guardarPresentaciones($db, $empresa, $producto, $normalizadas, $editar);
     if ($opcionales) {
-        $columnas = implode(', ', array_map(static fn(string $columna): string => "$columna = ?", array_keys($opcionales)));
-        $db->prepare("UPDATE productos SET $columnas WHERE empresa_id = ? AND id = ?")
-            ->execute([...array_values($opcionales), $empresa, $producto]);
+        $cols = SchemaHelper::asegurarColumnasProductos($db);
+        $opcionalesFiltrados = [];
+        foreach ($opcionales as $col => $val) {
+            if (in_array(strtolower($col), $cols, true)) {
+                $opcionalesFiltrados[$col] = $val;
+            }
+        }
+        if ($opcionalesFiltrados) {
+            $columnas = implode(', ', array_map(static fn(string $columna): string => "$columna = ?", array_keys($opcionalesFiltrados)));
+            $db->prepare("UPDATE productos SET $columnas WHERE empresa_id = ? AND id = ?")
+                ->execute([...array_values($opcionalesFiltrados), $empresa, $producto]);
+        }
     }
     if ($cambiaMinimo) {
         if ($minimo === null) {

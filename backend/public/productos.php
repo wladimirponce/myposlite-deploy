@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../config/database.php';
 require __DIR__ . '/../config/session.php';
+require __DIR__ . '/../src/SchemaHelper.php';
 require __DIR__ . '/../src/AccesoMaestros.php';
 require __DIR__ . '/../src/CatalogoProducto.php';
 require __DIR__ . '/../src/ImportacionCatalogo.php';
@@ -83,14 +84,19 @@ try {
             $cursor = (string) ($encontrada['producto_id'] - 1);
         }
         $limite = $codigo === null ? 51 : 1;
-        $query = $db->prepare('SELECT p.id, p.sku, p.nombre, p.unidad_base, p.afecto_iva, p.verificar_edad,
-                   p.revision, p.imagen_url, p.principio_activo, p.laboratorio, c.nombre AS categoria, pm.minimo AS minimo_local, p.impuesto_codigo,
+        $cols = SchemaHelper::asegurarColumnasProductos($db);
+        $campoImg = in_array('imagen_url', $cols, true) ? 'p.imagen_url' : 'NULL AS imagen_url';
+        $campoPrincipio = in_array('principio_activo', $cols, true) ? 'p.principio_activo' : 'NULL AS principio_activo';
+        $campoLab = in_array('laboratorio', $cols, true) ? 'p.laboratorio' : 'NULL AS laboratorio';
+
+        $query = $db->prepare("SELECT p.id, p.sku, p.nombre, p.unidad_base, p.afecto_iva, p.verificar_edad,
+                   p.revision, {$campoImg}, {$campoPrincipio}, {$campoLab}, c.nombre AS categoria, pm.minimo AS minimo_local, p.impuesto_codigo,
                    p.costo, p.margen_minimo, p.proveedor_habitual_id, pr.razon_social AS proveedor_habitual
             FROM productos p
             LEFT JOIN categorias_producto c ON c.empresa_id = p.empresa_id AND c.id = p.categoria_id
             LEFT JOIN contactos pr ON pr.empresa_id = p.empresa_id AND pr.id = p.proveedor_habitual_id
             LEFT JOIN producto_minimos pm ON pm.empresa_id = p.empresa_id AND pm.producto_id = p.id AND pm.local_codigo = ?
-            WHERE p.empresa_id = ? AND p.id > ? ORDER BY p.id LIMIT ' . $limite);
+            WHERE p.empresa_id = ? AND p.id > ? ORDER BY p.id LIMIT {$limite}");
         $query->execute([$local, $empresa, $cursor]);
         $productos = $query->fetchAll(PDO::FETCH_ASSOC);
         $hayMas = count($productos) === 51;
