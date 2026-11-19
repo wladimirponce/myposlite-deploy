@@ -1,5 +1,53 @@
 [
   {
+    "sku": "FAR-7841141002750",
+    "nombre": "ILTUX HCT 40/12,5 MG X 28 COM",
+    "categoria": "ANTIHIPERTENSIVOS",
+    "principio_activo": "OLMESARTAN + HIDROCLOROTIAZIDA",
+    "laboratorio": "TECNOFARMA",
+    "unidad_base": "unidad",
+    "afecto_iva": 1,
+    "precio": 24990,
+    "codigo_barras": "7841141002750",
+    "imagen_url": "/img/productos/7841141002750.jpg"
+  },
+  {
+    "sku": "FAR-7841141002743",
+    "nombre": "ILTUX HCT 20/12,5 MG X 28 COM",
+    "categoria": "ANTIHIPERTENSIVOS",
+    "principio_activo": "OLMESARTAN + HIDROCLOROTIAZIDA",
+    "laboratorio": "TECNOFARMA",
+    "unidad_base": "unidad",
+    "afecto_iva": 1,
+    "precio": 22990,
+    "codigo_barras": "7841141002743",
+    "imagen_url": "/img/productos/7841141002743.jpg"
+  },
+  {
+    "sku": "FAR-7841141002729",
+    "nombre": "ILTUX 20 MG X 28 COM",
+    "categoria": "ANTIHIPERTENSIVOS",
+    "principio_activo": "OLMESARTAN MEDOXOMILO",
+    "laboratorio": "TECNOFARMA",
+    "unidad_base": "unidad",
+    "afecto_iva": 1,
+    "precio": 19990,
+    "codigo_barras": "7841141002729",
+    "imagen_url": "/img/productos/7841141002729.jpg"
+  },
+  {
+    "sku": "FAR-7841141002736",
+    "nombre": "ILTUX 40 MG X 28 COM",
+    "categoria": "ANTIHIPERTENSIVOS",
+    "principio_activo": "OLMESARTAN MEDOXOMILO",
+    "laboratorio": "TECNOFARMA",
+    "unidad_base": "unidad",
+    "afecto_iva": 1,
+    "precio": 22990,
+    "codigo_barras": "7841141002736",
+    "imagen_url": "/img/productos/7841141002736.jpg"
+  },
+  {
     "sku": "FAR-41002",
     "nombre": "ABECIDIN-ACD GTS.30ML",
     "categoria": "POLIVITAMINOTERAPIA",
