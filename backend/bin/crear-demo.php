@@ -56,6 +56,15 @@ try {
         $db->prepare('INSERT INTO membresias (empresa_id, usuario_id, rol_codigo) VALUES (?, ?, ?)')
             ->execute([$empresa, $usuario, 'administrador']);
     }
+
+    // Precargar automáticamente el catálogo maestro de Farmacia en la empresa demo
+    require_once __DIR__ . '/../src/SembradorCatalogo.php';
+    try {
+        SembradorCatalogo::sembrar($db, (string) $empresa, 'farmacia');
+    } catch (Throwable $e) {
+        error_log('Sembrado demo farmacia error: ' . $e->getMessage());
+    }
+
     $db->commit();
     echo json_encode(['correo' => $correo, 'clave' => $clave], JSON_THROW_ON_ERROR) . PHP_EOL;
 } catch (Throwable $error) {
