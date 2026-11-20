@@ -79,6 +79,13 @@ function guardarProducto(PDO $db, string $empresa, string $local, string $id, ar
     if (array_key_exists('laboratorio', $input)) {
         $opcionales['laboratorio'] = $laboratorio === null || trim($laboratorio) === '' ? null : trim($laboratorio);
     }
+    $imagenUrl = $input['imagenUrl'] ?? null;
+    if ($imagenUrl !== null && (!is_string($imagenUrl) || strlen(trim($imagenUrl)) > 500)) {
+        throw new InvalidArgumentException('Revise la URL de imagen del producto.');
+    }
+    if (array_key_exists('imagenUrl', $input)) {
+        $opcionales['imagen_url'] = $imagenUrl === null || trim($imagenUrl) === '' ? null : trim($imagenUrl);
+    }
     $cambiaMinimo = array_key_exists('minimoLocal', $input);
     $minimo = $input['minimoLocal'] ?? null;
     if ($minimo !== null && (!is_string($minimo) || !preg_match('/^\d{1,12}(?:\.\d{1,6})?$/D', $minimo))) {

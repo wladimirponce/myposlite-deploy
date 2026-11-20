@@ -133,16 +133,18 @@ function resumenPeriodoBase(PDO $db, string $empresa, array $locales, DateTimeIm
     $devolucionesCantidad = (int) ($dev['cantidad'] ?? 0);
     $devolucionesTotal = (int) ($dev['total'] ?? 0);
 
-    // 3. Rentabilidad estimada por líneas de venta (cruzando con costo neto actual del producto)
+    // 3. Rentabilidad estimada por líneas de venta netas de devoluciones (cruzando con costo neto actual del producto)
     $stmtRent = $db->prepare("SELECT
-            COALESCE(SUM(CASE WHEN p.costo IS NOT NULL THEN
-                (CASE WHEN vl.exento = 1 THEN vl.monto ELSE vl.monto / 1.19 END)
+            COALESCE(SUM(CASE WHEN p.costo IS NOT NULL AND vl.cantidad > 0 THEN
+                ((CASE WHEN vl.exento = 1 THEN vl.monto ELSE vl.monto / 1.19 END) * ((vl.cantidad - vl.devuelta) / vl.cantidad))
             ELSE 0 END), 0) AS venta_neta_con_costo,
             COALESCE(SUM(CASE WHEN p.costo IS NOT NULL THEN
-                (vl.cantidad * vl.equivalencia * p.costo)
+                ((vl.cantidad - vl.devuelta) * vl.equivalencia * p.costo)
             ELSE 0 END), 0) AS costo_total,
-            COALESCE(SUM(CASE WHEN vl.exento = 1 THEN vl.monto ELSE vl.monto / 1.19 END), 0) AS venta_neta_total,
-            COALESCE(SUM(vl.cantidad), 0) AS unidades_vendidas
+            COALESCE(SUM(CASE WHEN vl.cantidad > 0 THEN
+                ((CASE WHEN vl.exento = 1 THEN vl.monto ELSE vl.monto / 1.19 END) * ((vl.cantidad - vl.devuelta) / vl.cantidad))
+            ELSE 0 END), 0) AS venta_neta_total,
+            COALESCE(SUM(vl.cantidad - vl.devuelta), 0) AS unidades_vendidas
         FROM venta_lineas vl
         JOIN ventas v ON v.empresa_id = vl.empresa_id AND v.id = vl.venta_id
         LEFT JOIN productos p ON p.empresa_id = vl.empresa_id AND p.id = vl.producto_id
@@ -373,17 +375,18 @@ function generarInformeCompleto(PDO $db, string $empresa, array $locales, DateTi
         'porcentaje' => $totalPagos > 0 ? round(((int) $mp['total'] / $totalPagos) * 100, 1) : 0.0,
     ], $mediosRaw);
 
-    // Top 15 productos más vendidos
+    // Top 15 productos más vendidos (netos de devoluciones)
     $stmtTopProd = $db->prepare("SELECT vl.producto_id, MAX(vl.nombre) AS nombre, MAX(p.sku) AS sku,
-            SUM(vl.cantidad) AS cantidad,
-            SUM(vl.monto) AS total,
-            SUM(CASE WHEN p.costo IS NOT NULL THEN (CASE WHEN vl.exento = 1 THEN vl.monto ELSE vl.monto / 1.19 END) ELSE 0 END) AS neta_con_costo,
-            SUM(CASE WHEN p.costo IS NOT NULL THEN (vl.cantidad * vl.equivalencia * p.costo) ELSE 0 END) AS costo_total
+            SUM(vl.cantidad - vl.devuelta) AS cantidad,
+            ROUND(SUM(CASE WHEN vl.cantidad > 0 THEN vl.monto * ((vl.cantidad - vl.devuelta) / vl.cantidad) ELSE 0 END)) AS total,
+            SUM(CASE WHEN p.costo IS NOT NULL AND vl.cantidad > 0 THEN ((CASE WHEN vl.exento = 1 THEN vl.monto ELSE vl.monto / 1.19 END) * ((vl.cantidad - vl.devuelta) / vl.cantidad)) ELSE 0 END) AS neta_con_costo,
+            SUM(CASE WHEN p.costo IS NOT NULL THEN ((vl.cantidad - vl.devuelta) * vl.equivalencia * p.costo) ELSE 0 END) AS costo_total
         FROM venta_lineas vl
         JOIN ventas v ON v.empresa_id = vl.empresa_id AND v.id = vl.venta_id
         LEFT JOIN productos p ON p.empresa_id = vl.empresa_id AND p.id = vl.producto_id
         WHERE vl.empresa_id = ? AND v.local_codigo IN ($in) AND v.creada_en >= ? AND v.creada_en < ?
         GROUP BY vl.producto_id
+        HAVING SUM(vl.cantidad - vl.devuelta) > 0
         ORDER BY total DESC
         LIMIT 15");
     $stmtTopProd->execute([$empresa, ...$locales, $lim['inicioUtc'], $lim['finUtc']]);

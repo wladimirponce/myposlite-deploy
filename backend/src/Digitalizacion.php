@@ -99,7 +99,7 @@ function leerArchivoRecibido(PDO $db, string $empresa, string $usuario, string $
  */
 function borradorLectura(PDO $db, string $empresa, string $local, string $id): array
 {
-    $query = $db->prepare('SELECT l.id, l.archivo_id, l.estado, l.modelo, l.resultado, l.error, l.creada_en, l.documento_id,
+    $query = $db->prepare('SELECT l.id, l.archivo_id, l.estado, l.modelo, l.resultado, l.error, l.creada_en, l.documento_id, l.usuario_id,
             a.nombre AS archivo
         FROM lecturas_documento l JOIN archivos_recibidos a ON a.empresa_id = l.empresa_id AND a.id = l.archivo_id
         WHERE l.empresa_id = ? AND l.id = ?');
@@ -119,14 +119,32 @@ function borradorLectura(PDO $db, string $empresa, string $local, string $id): a
     $avisos = [];
 
     $proveedor = null;
+    $proveedorCreado = false;
     if ($detectado['proveedorRut'] !== null) {
         try {
             $rut = canonizarRut($detectado['proveedorRut']);
-            $buscar = $db->prepare('SELECT id, razon_social FROM contactos WHERE empresa_id = ? AND rut = ? AND proveedor = 1');
+            $buscar = $db->prepare('SELECT id, razon_social, proveedor FROM contactos WHERE empresa_id = ? AND rut = ?');
             $buscar->execute([$empresa, $rut]);
-            $proveedor = $buscar->fetch(PDO::FETCH_ASSOC) ?: null;
-            if ($proveedor === null) {
-                $avisos[] = "El proveedor {$detectado['proveedorNombre']} (RUT {$detectado['proveedorRut']}) no está registrado como proveedor.";
+            $existente = $buscar->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($existente !== null) {
+                if (!(int) $existente['proveedor']) {
+                    $db->prepare('UPDATE contactos SET proveedor = 1 WHERE empresa_id = ? AND id = ?')
+                        ->execute([$empresa, $existente['id']]);
+                    $avisos[] = "El contacto {$existente['razon_social']} (RUT {$detectado['proveedorRut']}) fue habilitado automáticamente como proveedor.";
+                }
+                $proveedor = $existente;
+            } else {
+                $razon = is_string($detectado['proveedorNombre'] ?? null) && trim($detectado['proveedorNombre']) !== ''
+                    ? mb_substr(trim($detectado['proveedorNombre']), 0, 160)
+                    : 'Proveedor RUT ' . $detectado['proveedorRut'];
+                $db->prepare('INSERT INTO contactos (empresa_id, rut, razon_social, proveedor, receptor) VALUES (?, ?, ?, 1, 0)')
+                    ->execute([$empresa, $rut, $razon]);
+                $nuevoId = (string) $db->lastInsertId();
+                $db->prepare('INSERT INTO contacto_eventos (empresa_id, contacto_id, usuario_id, accion) VALUES (?, ?, ?, ?)')
+                    ->execute([$empresa, $nuevoId, $lectura['usuario_id'], 'crear']);
+                $proveedor = ['id' => $nuevoId, 'razon_social' => $razon];
+                $proveedorCreado = true;
+                $avisos[] = "Proveedor {$razon} (RUT {$detectado['proveedorRut']}) creado automáticamente en Contactos.";
             }
         } catch (InvalidArgumentException) {
             $avisos[] = 'El RUT del proveedor no se leyó correctamente. Seleccione el proveedor.';
@@ -135,6 +153,7 @@ function borradorLectura(PDO $db, string $empresa, string $local, string $id): a
         $avisos[] = 'No se leyó el RUT del proveedor. Seleccione el proveedor.';
     }
     $base['proveedorId'] = $proveedor ? (string) $proveedor['id'] : null;
+    $base['proveedorCreado'] = $proveedorCreado;
 
     if ($proveedor && $detectado['tipo'] !== null && $detectado['folio'] !== null) {
         $existe = $db->prepare('SELECT 1 FROM documentos_recibidos WHERE empresa_id = ? AND proveedor_id = ? AND tipo = ? AND folio = ?');
