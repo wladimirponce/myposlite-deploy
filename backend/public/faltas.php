@@ -56,7 +56,8 @@ try {
     }
 
     if ($method === 'POST') {
-        responder(201, registrarFalta($db, $empresa, $local, $usuario['id'] ?? null, $body));
+        $usuarioId = is_array($usuario) ? ($usuario['id'] ?? null) : (string) $usuario;
+        responder(201, registrarFalta($db, $empresa, $local, $usuarioId, $body));
     }
 
     if ($method === 'PATCH') {
