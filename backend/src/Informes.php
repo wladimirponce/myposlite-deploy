@@ -195,7 +195,22 @@ function resumenPeriodoBase(PDO $db, string $empresa, array $locales, DateTimeIm
     $comprasAfectas = (int) round((float) ($c['compras_afectas'] ?? 0));
     $ncRecibidas = (int) round((float) ($c['nc_recibidas'] ?? 0));
 
-    // 6. Descuadre acumulado en turnos cerrados
+    // 6. Gastos operacionales fuera de caja (arriendo, luz, agua, sueldos, honorarios)
+    $gastosOperacionales = 0;
+    $gastosDocs = 0;
+    try {
+        $stmtGastos = $db->prepare("SELECT COUNT(*) AS cantidad, COALESCE(SUM(monto), 0) AS total
+            FROM gastos_operacionales
+            WHERE empresa_id = ? AND local_codigo IN ($in) AND fecha >= ? AND fecha <= ?");
+        $stmtGastos->execute([$empresa, ...$locales, $lim['desdeSql'], $lim['hastaSql']]);
+        $g = $stmtGastos->fetch(PDO::FETCH_ASSOC) ?: [];
+        $gastosOperacionales = (int) ($g['total'] ?? 0);
+        $gastosDocs = (int) ($g['cantidad'] ?? 0);
+    } catch (Throwable) {
+        // Si la tabla aún no existe, continuar en 0.
+    }
+
+    // 7. Descuadre acumulado en turnos cerrados
     $stmtTurnos = $db->prepare("SELECT COUNT(*) AS turnos_cerrados,
             SUM(CASE WHEN diferencia <> 0 THEN 1 ELSE 0 END) AS turnos_con_descuadre,
             COALESCE(SUM(diferencia), 0) AS descuadre_total
@@ -206,8 +221,9 @@ function resumenPeriodoBase(PDO $db, string $empresa, array $locales, DateTimeIm
 
     $ventasNetasComerciales = $ventasTotal - $devolucionesTotal;
     $ticketPromedio = $ventasCantidad > 0 ? (int) round($ventasTotal / $ventasCantidad) : 0;
-    $egresosTotales = $comprasTotal + $retirosCaja;
+    $egresosTotales = $comprasTotal + $retirosCaja + $gastosOperacionales;
     $flujoNeto = ($ventasNetasComerciales + $ingresosCaja) - $egresosTotales;
+    $utilidadNetaEstimada = $utilidadBruta - $gastosOperacionales;
 
     return [
         'ventasCantidad' => $ventasCantidad,
@@ -220,12 +236,15 @@ function resumenPeriodoBase(PDO $db, string $empresa, array $locales, DateTimeIm
         'devolucionesCantidad' => $devolucionesCantidad,
         'devolucionesTotal' => $devolucionesTotal,
         'utilidadBruta' => $utilidadBruta,
+        'utilidadNetaEstimada' => $utilidadNetaEstimada,
         'costoVendido' => (int) round($costoTotal),
         'margenPct' => $margenPct,
         'coberturaCostoPct' => $coberturaCostoPct,
         'unidadesVendidas' => round((float) ($r['unidades_vendidas'] ?? 0), 2),
         'ingresosCaja' => $ingresosCaja,
         'retirosCaja' => $retirosCaja,
+        'gastosOperacionales' => $gastosOperacionales,
+        'gastosDocs' => $gastosDocs,
         'comprasTotal' => $comprasTotal,
         'comprasDocs' => $comprasDocs,
         'comprasAfectas' => $comprasAfectas,
@@ -680,6 +699,19 @@ function generarInformeCompleto(PDO $db, string $empresa, array $locales, DateTi
     $ivaCreditoEstimado = (int) round($comprasNetasAfectas - ($comprasNetasAfectas / 1.19));
     $ivaBalanceEstimado = $ivaDebitoNeto - $ivaCreditoEstimado;
 
+    // Cuentas corrientes / Fiado (saldo total por cobrar)
+    $fiadoResumen = ['totalPorCobrar' => 0, 'clientesConDeuda' => 0];
+    try {
+        $stmtFiado = $db->prepare('SELECT COUNT(*) AS clientes, COALESCE(SUM(saldo), 0) AS total
+            FROM cuentas_corrientes WHERE empresa_id = ? AND saldo > 0');
+        $stmtFiado->execute([$empresa]);
+        $fi = $stmtFiado->fetch(PDO::FETCH_ASSOC) ?: [];
+        $fiadoResumen['totalPorCobrar'] = (int) ($fi['total'] ?? 0);
+        $fiadoResumen['clientesConDeuda'] = (int) ($fi['clientes'] ?? 0);
+    } catch (Throwable) {
+        // Si la tabla aún no existe, continuar en 0.
+    }
+
     return [
         'periodo' => [
             'desde' => $lim['desdeSql'],
@@ -716,6 +748,7 @@ function generarInformeCompleto(PDO $db, string $empresa, array $locales, DateTi
             'valorRiesgoVencimiento' => (int) round((float) ($venc['valor_riesgo'] ?? 0)),
         ],
         'faltas' => $faltasResumen,
+        'cuentasPorCobrar' => $fiadoResumen,
         'tributario' => [
             'ivaDebito' => $ivaDebitoNeto,
             'ivaCredito' => $ivaCreditoEstimado,

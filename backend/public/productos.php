@@ -85,10 +85,19 @@ try {
         }
         $tamanoPagina = isset($_GET['limite']) ? min(1000, max(1, (int) $_GET['limite'])) : 500;
         $limite = $codigo === null ? ($tamanoPagina + 1) : 1;
+        $termino = isset($_GET['buscar']) && is_string($_GET['buscar']) ? trim($_GET['buscar']) : '';
         $cols = SchemaHelper::asegurarColumnasProductos($db);
         $campoImg = in_array('imagen_url', $cols, true) ? 'p.imagen_url' : 'NULL AS imagen_url';
         $campoPrincipio = in_array('principio_activo', $cols, true) ? 'p.principio_activo' : 'NULL AS principio_activo';
         $campoLab = in_array('laboratorio', $cols, true) ? 'p.laboratorio' : 'NULL AS laboratorio';
+
+        $whereExtra = '';
+        $params = [$local, $empresa, $cursor];
+        if ($codigo === null && $termino !== '') {
+            $like = '%' . $termino . '%';
+            $whereExtra = ' AND (p.nombre LIKE ? OR p.sku LIKE ? OR c.nombre LIKE ? OR EXISTS (SELECT 1 FROM producto_presentaciones pb WHERE pb.empresa_id = p.empresa_id AND pb.producto_id = p.id AND pb.codigo_barras LIKE ?))';
+            array_push($params, $like, $like, $like, $like);
+        }
 
         $query = $db->prepare("SELECT p.id, p.sku, p.nombre, p.unidad_base, p.afecto_iva, p.verificar_edad,
                    p.revision, {$campoImg}, {$campoPrincipio}, {$campoLab}, c.nombre AS categoria, pm.minimo AS minimo_local, p.impuesto_codigo,
@@ -97,8 +106,8 @@ try {
             LEFT JOIN categorias_producto c ON c.empresa_id = p.empresa_id AND c.id = p.categoria_id
             LEFT JOIN contactos pr ON pr.empresa_id = p.empresa_id AND pr.id = p.proveedor_habitual_id
             LEFT JOIN producto_minimos pm ON pm.empresa_id = p.empresa_id AND pm.producto_id = p.id AND pm.local_codigo = ?
-            WHERE p.empresa_id = ? AND p.id > ? ORDER BY p.id LIMIT {$limite}");
-        $query->execute([$local, $empresa, $cursor]);
+            WHERE p.empresa_id = ? AND p.id > ?{$whereExtra} ORDER BY p.id LIMIT {$limite}");
+        $query->execute($params);
         $productos = $query->fetchAll(PDO::FETCH_ASSOC);
         $hayMas = count($productos) > $tamanoPagina;
         if ($hayMas) {
