@@ -1,5 +1,5 @@
 // MyPOS Lite - Service Worker PWA Offline
-const CACHE_NAME = 'myposlite-app-v1'
+const CACHE_NAME = 'myposlite-app-v2'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -54,7 +54,10 @@ self.addEventListener('fetch', (event) => {
           }),
           {
             status: 503,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-MyPOSLite-Offline': '1',
+            },
           }
         )
       })

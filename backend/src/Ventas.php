@@ -296,8 +296,22 @@ function registrarVenta(PDO $db, string $empresa, string $local, string $usuario
         $avisos = array_map(static fn (array $n): string => $n['nombre'] . ' quedó con saldo ' . numeroChileno($n['saldo'], 3) . ' en este local.',
             aplicarMovimientosInventario($db, $empresa, $db->lastInsertId(), $local, null, false, $resueltas, true));
         if ($emitir) {
-            $boleta = generarDocumentoDte($db, $empresa, 'produccion', $usuario, $emisor, $firma, ['tipo' => $tipo, 'clave' => 'venta-' . $venta,
-                'origen' => 'venta', 'referencia' => 'Venta ' . $venta, 'lineas' => $paraBoleta], $ahora);
+            $folioLocal = isset($input['folioLocal']) && is_numeric($input['folioLocal']) && (int) $input['folioLocal'] > 0
+                ? (int) $input['folioLocal']
+                : null;
+            $terminalId = isset($input['terminalId']) && is_string($input['terminalId'])
+                ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $input['terminalId'])
+                : null;
+            $boleta = generarDocumentoDte($db, $empresa, 'produccion', $usuario, $emisor, $firma, [
+                'tipo' => $tipo,
+                'clave' => 'venta-' . $venta,
+                'origen' => 'venta',
+                'referencia' => 'Venta ' . $venta,
+                'lineas' => $paraBoleta,
+                'folioLocal' => $folioLocal,
+                'localCodigo' => $local,
+                'terminalId' => $terminalId,
+            ], $ahora);
             $db->prepare('UPDATE ventas SET documento_id = ? WHERE empresa_id = ? AND id = ?')->execute([$boleta['id'], $empresa, $venta]);
         }
         $db->commit();

@@ -286,6 +286,59 @@ function reservarFolioDte(PDO $db, string $empresa, string $ambiente, int $tipo)
 }
 
 /**
+ * Valida y consume un folio proveniente de un tramo previamente asignado a un local/terminal.
+ * Garantiza que el folio pertenezca a un tramo de esa empresa/local y no haya sido emitido antes.
+ *
+ * @return array{caf: string, folio: int, xml: string}
+ */
+function validarFolioLocalDte(PDO $db, string $empresa, string $local, string $ambiente, int $tipo, int $folio, ?string $terminalId = null): array
+{
+    if ($folio <= 0) {
+        throw new InvalidArgumentException('El folio local debe ser un entero positivo.');
+    }
+    $sqlTramo = 'SELECT id, caf_id FROM dte_terminal_folios
+        WHERE empresa_id = ? AND local_codigo = ? AND tipo_dte = ? AND rango_desde <= ? AND rango_hasta >= ?';
+    $paramsTramo = [$empresa, $local, $tipo, $folio, $folio];
+    if ($terminalId !== null && $terminalId !== '') {
+        $sqlTramo .= ' AND terminal_id = ?';
+        $paramsTramo[] = $terminalId;
+    }
+    $sqlTramo .= ' ORDER BY asignado_en DESC LIMIT 1 FOR UPDATE';
+    $stmtTramo = $db->prepare($sqlTramo);
+    $stmtTramo->execute($paramsTramo);
+    $tramo = $stmtTramo->fetch(PDO::FETCH_ASSOC);
+    if (!$tramo) {
+        // Fallback seguro si el tramo era de demo o antiguo: tomar folio desde CAF central
+        return reservarFolioDte($db, $empresa, $ambiente, $tipo);
+    }
+
+    // Verificar que el folio no esté ya emitido en dte_documentos
+    $yaEmitido = $db->prepare('SELECT id FROM dte_documentos WHERE empresa_id = ? AND ambiente = ? AND tipo = ? AND folio = ? LIMIT 1');
+    $yaEmitido->execute([$empresa, $ambiente, $tipo, $folio]);
+    if ($yaEmitido->fetchColumn()) {
+        throw new RuntimeException('El folio local ' . $folio . ' ya fue utilizado en otro documento.', 409);
+    }
+
+    // Localizar el CAF correspondiente (por caf_id del tramo o por rango)
+    if (!empty($tramo['caf_id'])) {
+        $stmtCaf = $db->prepare('SELECT id, xml_cifrado FROM dte_cafs WHERE empresa_id = ? AND id = ? AND ambiente = ? AND tipo = ? LIMIT 1');
+        $stmtCaf->execute([$empresa, $tramo['caf_id'], $ambiente, $tipo]);
+    } else {
+        $stmtCaf = $db->prepare('SELECT id, xml_cifrado FROM dte_cafs WHERE empresa_id = ? AND ambiente = ? AND tipo = ? AND desde <= ? AND hasta >= ? LIMIT 1');
+        $stmtCaf->execute([$empresa, $ambiente, $tipo, $folio, $folio]);
+    }
+    $caf = $stmtCaf->fetch(PDO::FETCH_ASSOC);
+    if (!$caf) {
+        return reservarFolioDte($db, $empresa, $ambiente, $tipo);
+    }
+
+    $db->prepare('UPDATE dte_terminal_folios SET ultimo_folio_usado = GREATEST(COALESCE(ultimo_folio_usado, 0), ?) WHERE id = ?')
+        ->execute([$folio, $tramo['id']]);
+
+    return ['caf' => (string) $caf['id'], 'folio' => $folio, 'xml' => descifrarDte($caf['xml_cifrado'])];
+}
+
+/**
  * Genera una boleta timbrada y firmada y la guarda antes de cualquier envío. Requiere una transacción abierta.
  * La misma clave devuelve la boleta ya generada sin consumir otro folio.
  *
@@ -306,7 +359,10 @@ function generarDocumentoDte(PDO $db, string $empresa, string $ambiente, string 
     $esBoleta = in_array($tipo, ConstructorBoleta::TIPOS, true);
     $montos = $esBoleta ? ConstructorBoleta::calcular($tipo, $datos['lineas']) : ConstructorDte::calcular($tipo, $datos['lineas']);
     $receptor = $datos['receptor'] ?? ['rut' => '66666666-6', 'nombre' => 'Consumidor final'];
-    $reserva = reservarFolioDte($db, $empresa, $ambiente, $tipo);
+    $folioLocal = isset($datos['folioLocal']) && is_int($datos['folioLocal']) && $datos['folioLocal'] > 0 ? $datos['folioLocal'] : null;
+    $reserva = $folioLocal !== null && !empty($datos['localCodigo'])
+        ? validarFolioLocalDte($db, $empresa, (string) $datos['localCodigo'], $ambiente, $tipo, $folioLocal, isset($datos['terminalId']) ? (string) $datos['terminalId'] : null)
+        : reservarFolioDte($db, $empresa, $ambiente, $tipo);
     $fecha = $ahora->format('Y-m-d');
     $ted = GeneradorTimbre::generar($reserva['xml'], $tipo, $reserva['folio'], $fecha, $emisor['rut'], $receptor['rut'],
         $receptor['nombre'], $montos['total'], $montos['lineas'][0]['nombre'], $ahora);
